@@ -4,6 +4,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Aes;
 
+/// <summary>
+/// Verifies AES key validation, ownership, and exported-copy semantics.
+/// </summary>
 public sealed class AesKeyTests
 {
     [Theory]

@@ -3,25 +3,23 @@ using System.Security.Cryptography;
 namespace CryptoKit.Hmac;
 
 /// <summary>
-/// Выполняет создание новых HMAC-ключей.
+/// Generates cryptographically random HMAC keys.
 /// </summary>
 public sealed class HmacKeyGenerator
 {
     /// <summary>
-    /// Создаёт новый криптографически стойкий HMAC-ключ.
+    /// Generates a new HMAC key of the requested size.
     /// </summary>
     /// <param name="keySize">
-    /// Размер HMAC-ключа в битах.
-    /// Допустимый диапазон для генерации: от 128 до 65536 бит включительно.
-    /// Значение должно быть кратно восьми.
+    /// The key size in bits. The generation range is 128 through 65,536 bits,
+    /// and the value must be divisible by eight.
     /// </param>
     /// <returns>
-    /// Новый HMAC-ключ.
-    /// Вызывающий код обязан освободить его через <see cref="IDisposable.Dispose"/>.
+    /// A new caller-owned HMAC key that must be disposed after use.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// Возникает, если размер ключа меньше 128 бит, больше 65536 бит
-    /// либо не кратен восьми.
+    /// <paramref name="keySize"/> is below 128 bits, exceeds the generation limit,
+    /// or is not divisible by eight.
     /// </exception>
     public HmacKey Generate(int keySize = 256)
     {
@@ -38,10 +36,8 @@ public sealed class HmacKeyGenerator
         }
         finally
         {
-            // HmacKey сохраняет собственную копию,
-            // поэтому временный массив можно очистить.
+            // HmacKey owns a copy, so the temporary generation buffer can be cleared immediately.
             CryptographicOperations.ZeroMemory(keyData);
         }
     }
 }
-

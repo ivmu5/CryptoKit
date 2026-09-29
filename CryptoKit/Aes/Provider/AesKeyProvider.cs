@@ -4,7 +4,7 @@ using CryptoKit.Storage;
 namespace CryptoKit.Aes;
 
 /// <summary>
-/// Предоставляет асинхронный доступ к AES-ключам через настроенное хранилище.
+/// Provides asynchronous access to AES keys backed by an <see cref="IKeyStorage"/>.
 /// </summary>
 public sealed class AesKeyProvider : IAesKeyProvider
 {
@@ -13,11 +13,11 @@ public sealed class AesKeyProvider : IAesKeyProvider
     private readonly StoredSecretKeyProvider<AesKey> _inner;
 
     /// <summary>
-    /// Создаёт провайдер AES-ключей.
+    /// Creates an AES key provider.
     /// </summary>
-    /// <param name="storage">Асинхронное хранилище ключевого материала.</param>
-    /// <param name="generator">Генератор новых AES-ключей.</param>
-    /// <param name="options">Настройки создаваемых AES-ключей.</param>
+    /// <param name="storage">The storage used to persist AES key material.</param>
+    /// <param name="generator">The generator used when a missing key must be created.</param>
+    /// <param name="options">The generation options captured by this provider.</param>
     public AesKeyProvider(
         IKeyStorage storage,
         AesKeyGenerator generator,
@@ -29,8 +29,8 @@ public sealed class AesKeyProvider : IAesKeyProvider
 
         AesKeyOptionsValidator.Validate(options);
 
-        // Фиксируем значение настройки, чтобы последующее изменение
-        // переданного AesKeyOptions не влияло на поведение провайдера.
+        // Capture the value so later mutations of the supplied options object do not
+        // change the behavior of this provider instance.
         var keySize = options.KeySize;
 
         _inner = new StoredSecretKeyProvider<AesKey>(
@@ -38,7 +38,7 @@ public sealed class AesKeyProvider : IAesKeyProvider
             static keyData => new AesKey(keyData),
             () => generator.Generate(keySize),
             KeySuffix,
-            "AES-ключ");
+            "AES key");
     }
 
     /// <inheritdoc />

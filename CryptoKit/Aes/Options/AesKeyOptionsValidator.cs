@@ -1,7 +1,13 @@
 namespace CryptoKit.Aes;
 
+/// <summary>
+/// Validates AES key-generation options and AES key sizes.
+/// </summary>
 internal static class AesKeyOptionsValidator
 {
+    /// <summary>
+    /// Validates a complete AES options object.
+    /// </summary>
     internal static void Validate(AesKeyOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -11,6 +17,9 @@ internal static class AesKeyOptionsValidator
             nameof(options.KeySize));
     }
 
+    /// <summary>
+    /// Validates that a key size is one of the AES sizes supported by CryptoKit.
+    /// </summary>
     internal static void ValidateKeySize(
         int keySize,
         string? parameterName = null)
@@ -20,7 +29,7 @@ internal static class AesKeyOptionsValidator
             throw new ArgumentOutOfRangeException(
                 parameterName,
                 keySize,
-                "Размер AES-ключа должен быть равен 128, 192 или 256 бит.");
+                "AES key size must be 128, 192, or 256 bits.");
         }
     }
 }

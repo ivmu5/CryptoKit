@@ -3,27 +3,21 @@ using System.Security.Cryptography;
 namespace CryptoKit.Secrets;
 
 /// <summary>
-/// Базовый тип для секретного ключевого материала
-/// с явным временем жизни и детерминированной очисткой собственного буфера.
+/// Base type for secret key material with explicit ownership and deterministic
+/// clearing of the owned buffer.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Экземпляр владеет собственной копией переданных данных.
-/// Исходный буфер вызывающего кода не сохраняется.
+/// The instance owns the supplied byte array and never exposes that buffer directly.
+/// Public access is provided through copies or caller-provided destinations.
 /// </para>
 /// <para>
-/// После завершения работы экземпляр необходимо освободить через
-/// <see cref="Dispose"/>. При этом собственный буфер немедленно очищается через
-/// <see cref="CryptographicOperations.ZeroMemory(Span{byte})"/>.
+/// Call <see cref="Dispose"/> when the material is no longer needed. Disposal clears
+/// the owned buffer immediately with <see cref="CryptographicOperations.ZeroMemory(Span{byte})"/>.
 /// </para>
 /// <para>
-/// Если <see cref="Dispose"/> не был вызван, финализатор выполняет очистку как
-/// резервную меру. Время запуска финализатора не гарантируется, поэтому он не
-/// заменяет явное освобождение экземпляра.
-/// </para>
-/// <para>
-/// Все операции, предоставляющие доступ к ключевому материалу после
-/// освобождения экземпляра, выбрасывают <see cref="ObjectDisposedException"/>.
+/// A finalizer performs best-effort clearing if disposal is omitted, but finalizer timing
+/// is nondeterministic and is not a substitute for explicit disposal.
 /// </para>
 /// </remarks>
 public abstract class SecretKeyMaterial : IDisposable
@@ -31,6 +25,10 @@ public abstract class SecretKeyMaterial : IDisposable
     private readonly object _syncRoot = new();
     private byte[]? _buffer;
 
+    /// <summary>
+    /// Initializes the instance with a buffer whose ownership is transferred to this object.
+    /// </summary>
+    /// <param name="ownedBuffer">The non-empty buffer that this instance will own and clear.</param>
     private protected SecretKeyMaterial(byte[] ownedBuffer)
     {
         ArgumentNullException.ThrowIfNull(ownedBuffer);
@@ -38,7 +36,7 @@ public abstract class SecretKeyMaterial : IDisposable
         if (ownedBuffer.Length == 0)
         {
             throw new ArgumentException(
-                "Секретный ключевой материал не может быть пустым.",
+                "Secret key material cannot be empty.",
                 nameof(ownedBuffer));
         }
 
@@ -47,15 +45,15 @@ public abstract class SecretKeyMaterial : IDisposable
     }
 
     /// <summary>
-    /// Размер секретного материала в байтах.
+    /// Gets the length of the secret material in bytes.
     /// </summary>
     /// <remarks>
-    /// Метаданные размера остаются доступны после освобождения экземпляра.
+    /// Length metadata remains available after disposal.
     /// </remarks>
     public int Length { get; }
 
     /// <summary>
-    /// Указывает, был ли собственный секретный буфер уничтожен.
+    /// Gets whether the owned secret buffer has been cleared and released.
     /// </summary>
     public bool IsDisposed
     {
@@ -69,16 +67,16 @@ public abstract class SecretKeyMaterial : IDisposable
     }
 
     /// <summary>
-    /// Копирует секретный материал в буфер вызывающего кода.
+    /// Copies the secret material into a caller-provided destination.
     /// </summary>
     /// <param name="destination">
-    /// Буфер, размер которого должен быть не меньше <see cref="Length"/>.
+    /// A destination buffer at least <see cref="Length"/> bytes long.
     /// </param>
     /// <exception cref="ArgumentException">
-    /// <paramref name="destination"/> слишком мал.
+    /// <paramref name="destination"/> is too small.
     /// </exception>
     /// <exception cref="ObjectDisposedException">
-    /// Экземпляр уже освобождён.
+    /// The instance has already been disposed.
     /// </exception>
     public void CopyTo(Span<byte> destination)
     {
@@ -89,7 +87,7 @@ public abstract class SecretKeyMaterial : IDisposable
             if (destination.Length < buffer.Length)
             {
                 throw new ArgumentException(
-                    $"Буфер назначения должен содержать не менее {buffer.Length} байт.",
+                    $"Destination buffer must contain at least {buffer.Length} bytes.",
                     nameof(destination));
             }
 
@@ -98,14 +96,14 @@ public abstract class SecretKeyMaterial : IDisposable
     }
 
     /// <summary>
-    /// Создаёт принадлежащую вызывающему коду копию секретного материала.
+    /// Exports a caller-owned copy of the secret material.
     /// </summary>
     /// <returns>
-    /// Новый массив байт. Вызывающий код становится владельцем массива
-    /// и отвечает за его очистку после завершения работы.
+    /// A new byte array. The caller owns the returned copy and is responsible for
+    /// clearing it after use.
     /// </returns>
     /// <exception cref="ObjectDisposedException">
-    /// Экземпляр уже освобождён.
+    /// The instance has already been disposed.
     /// </exception>
     public byte[] Export()
     {
@@ -116,8 +114,7 @@ public abstract class SecretKeyMaterial : IDisposable
     }
 
     /// <summary>
-    /// Очищает собственный секретный буфер.
-    /// Повторный вызов безопасен.
+    /// Clears the owned secret buffer. Repeated calls are safe.
     /// </summary>
     public void Dispose()
     {
@@ -125,12 +122,17 @@ public abstract class SecretKeyMaterial : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    // Резервно очищает секретный буфер, если Dispose не был вызван явно.
+    /// <summary>
+    /// Provides best-effort clearing when callers fail to dispose the instance.
+    /// </summary>
     ~SecretKeyMaterial()
     {
         ClearBuffer();
     }
 
+    /// <summary>
+    /// Clears and releases the owned buffer under synchronization.
+    /// </summary>
     private void ClearBuffer()
     {
         lock (_syncRoot)
@@ -146,6 +148,9 @@ public abstract class SecretKeyMaterial : IDisposable
         }
     }
 
+    /// <summary>
+    /// Returns the owned buffer while the instance is alive.
+    /// </summary>
     private byte[] GetBufferOrThrow()
     {
         return _buffer ?? throw new ObjectDisposedException(GetType().FullName);

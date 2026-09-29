@@ -4,6 +4,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Storage;
 
+/// <summary>
+/// Verifies file-storage CRUD, atomicity, cancellation boundaries, permissions, and races.
+/// </summary>
 public sealed class FileKeyStorageTests
 {
     [Fact]
@@ -637,7 +640,7 @@ public sealed class FileKeyStorageTests
                 if (!barrier.SignalAndWait(TimeSpan.FromSeconds(5)))
                 {
                     throw new TimeoutException(
-                        "Обе конкурентные операции не достигли границы commit вовремя.");
+                        "Both concurrent operations failed to reach the commit boundary in time.");
                 }
             };
 

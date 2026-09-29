@@ -5,29 +5,21 @@ using Microsoft.Extensions.DependencyInjection;
 namespace CryptoKit.Hmac;
 
 /// <summary>
-/// Содержит методы расширения для регистрации HMAC-компонентов CryptoKit.
+/// Provides dependency-injection registration for CryptoKit HMAC services.
 /// </summary>
 public static class HmacServiceCollectionExtensions
 {
     /// <summary>
-    /// Добавляет генератор и провайдер HMAC-ключей
-    /// в коллекцию сервисов приложения.
+    /// Registers the HMAC key generator and key provider.
     /// </summary>
-    /// <param name="services">
-    /// Коллекция сервисов приложения.
-    /// </param>
+    /// <param name="services">The application service collection.</param>
     /// <param name="configure">
-    /// Необязательная настройка параметров создаваемых HMAC-ключей.
+    /// An optional callback used to configure newly generated HMAC keys.
     /// </param>
-    /// <returns>
-    /// Исходная коллекция сервисов для возможности цепочного вызова методов.
-    /// </returns>
+    /// <returns>The original service collection.</returns>
     /// <remarks>
-    /// Перед использованием HMAC в контейнере должна быть зарегистрирована
-    /// реализация <see cref="IKeyStorage"/>.
-    ///
-    /// Один зарегистрированный провайдер может работать
-    /// с несколькими HMAC-ключами по разным идентификаторам.
+    /// An <see cref="IKeyStorage"/> implementation must be registered before the
+    /// provider is resolved. A single provider can manage multiple logical HMAC keys.
     /// </remarks>
     public static IServiceCollection AddCryptoKitHmac(
         this IServiceCollection services,
@@ -40,8 +32,8 @@ public static class HmacServiceCollectionExtensions
 
         HmacKeyOptionsValidator.Validate(configuredOptions);
 
-        // Провайдер получает отдельный снимок настроек. Изменяемый объект,
-        // переданный в configure, не сохраняется и не публикуется через DI.
+        // Capture an immutable snapshot so later mutation of the caller's options object
+        // cannot alter the lifetime behavior of the registered singleton provider.
         var options = new HmacKeyOptions
         {
             KeySize = configuredOptions.KeySize

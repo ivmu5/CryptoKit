@@ -1,22 +1,23 @@
 namespace CryptoKit.Storage;
 
 /// <summary>
-/// Представляет настройки файлового хранилища криптографических ключей.
+/// Configures the file-backed cryptographic key storage.
 /// </summary>
 public sealed class FileKeyStorageOptions
 {
     /// <summary>
-    /// Каталог, в котором будут храниться файлы ключей.
-    /// Значение должно быть задано приложением явно.
+    /// Gets or sets the directory that stores key files.
     /// </summary>
+    /// <remarks>
+    /// The application must configure this path explicitly; CryptoKit does not choose a default.
+    /// </remarks>
     public string DirectoryPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// Максимальный размер одной записи хранилища в байтах.
+    /// Gets or sets the maximum size, in bytes, of one storage record.
     /// </summary>
     /// <remarks>
-    /// Ограничение применяется как при записи, так и при чтении.
-    /// По умолчанию допускается не более 64 КиБ на одну запись.
+    /// The limit is enforced for both reads and writes. The default is 64 KiB per record.
     /// </remarks>
     public int MaximumEntrySizeBytes { get; set; } = 64 * 1024;
 }

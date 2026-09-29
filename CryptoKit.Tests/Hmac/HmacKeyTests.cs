@@ -4,6 +4,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Hmac;
 
+/// <summary>
+/// Verifies HMAC key-material validation and ownership semantics.
+/// </summary>
 public sealed class HmacKeyTests
 {
     [Fact]
@@ -18,8 +21,7 @@ public sealed class HmacKeyTests
     [Fact]
     public void Constructor_WithMaterialAboveGenerationLimit_IsStillValid()
     {
-        // Ограничение 65536 бит относится к генерации.
-        // Уже существующий key material может быть больше.
+        // The 65,536-bit limit applies to generation only; imported material may be larger.
         using var key = new HmacKey(new byte[8193]);
 
         Assert.Equal(8193 * 8, key.KeySize);

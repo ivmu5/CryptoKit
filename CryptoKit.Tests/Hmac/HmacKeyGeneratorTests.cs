@@ -3,6 +3,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Hmac;
 
+/// <summary>
+/// Verifies HMAC key generation limits and requested key sizes.
+/// </summary>
 public sealed class HmacKeyGeneratorTests
 {
     [Fact]

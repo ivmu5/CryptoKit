@@ -4,7 +4,7 @@ using CryptoKit.Storage;
 namespace CryptoKit.Hmac;
 
 /// <summary>
-/// Предоставляет асинхронный доступ к HMAC-ключам через настроенное хранилище.
+/// Provides asynchronous access to HMAC keys backed by an <see cref="IKeyStorage"/>.
 /// </summary>
 public sealed class HmacKeyProvider : IHmacKeyProvider
 {
@@ -13,11 +13,11 @@ public sealed class HmacKeyProvider : IHmacKeyProvider
     private readonly StoredSecretKeyProvider<HmacKey> _inner;
 
     /// <summary>
-    /// Создаёт провайдер HMAC-ключей.
+    /// Creates an HMAC key provider.
     /// </summary>
-    /// <param name="storage">Асинхронное хранилище ключевого материала.</param>
-    /// <param name="generator">Генератор новых HMAC-ключей.</param>
-    /// <param name="options">Настройки создаваемых HMAC-ключей.</param>
+    /// <param name="storage">The storage used to persist HMAC key material.</param>
+    /// <param name="generator">The generator used when a missing key must be created.</param>
+    /// <param name="options">The generation options captured by this provider.</param>
     public HmacKeyProvider(
         IKeyStorage storage,
         HmacKeyGenerator generator,
@@ -29,8 +29,8 @@ public sealed class HmacKeyProvider : IHmacKeyProvider
 
         HmacKeyOptionsValidator.Validate(options);
 
-        // Фиксируем значение настройки, чтобы последующее изменение
-        // переданного HmacKeyOptions не влияло на поведение провайдера.
+        // Capture the value so later mutations of the supplied options object do not
+        // change the behavior of this provider instance.
         var keySize = options.KeySize;
 
         _inner = new StoredSecretKeyProvider<HmacKey>(
@@ -38,7 +38,7 @@ public sealed class HmacKeyProvider : IHmacKeyProvider
             static keyData => new HmacKey(keyData),
             () => generator.Generate(keySize),
             KeySuffix,
-            "HMAC-ключ");
+            "HMAC key");
     }
 
     /// <inheritdoc />

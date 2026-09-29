@@ -1,19 +1,28 @@
 namespace CryptoKit.Internal;
 
+/// <summary>
+/// Validates logical key identifiers before they are passed to providers or storage backends.
+/// </summary>
 internal static class KeyIdValidator
 {
+    /// <summary>
+    /// Ensures that a key identifier is non-empty and contains a valid UTF-16 sequence.
+    /// </summary>
     internal static void Validate(string keyId)
     {
         if (string.IsNullOrWhiteSpace(keyId))
         {
             throw new ArgumentException(
-                "Идентификатор ключа не может быть пустым.",
+                "Key identifier cannot be empty or whitespace.",
                 nameof(keyId));
         }
 
         ValidateUtf16(keyId, nameof(keyId));
     }
 
+    /// <summary>
+    /// Rejects unpaired UTF-16 surrogate code units so later UTF-8 encoding is deterministic.
+    /// </summary>
     private static void ValidateUtf16(
         string value,
         string parameterName)
@@ -41,11 +50,14 @@ internal static class KeyIdValidator
         }
     }
 
+    /// <summary>
+    /// Creates the consistent validation exception used for malformed UTF-16 input.
+    /// </summary>
     private static ArgumentException CreateInvalidUnicodeException(
         string parameterName)
     {
         return new ArgumentException(
-            "Идентификатор ключа должен содержать корректную UTF-16 последовательность.",
+            "Key identifier must contain a valid UTF-16 sequence.",
             parameterName);
     }
 }

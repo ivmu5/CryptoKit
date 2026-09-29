@@ -5,27 +5,22 @@ using CryptoKit.Internal;
 namespace CryptoKit.Storage;
 
 /// <summary>
-/// Реализует асинхронное хранение криптографического ключевого материала
-/// в файловой системе.
+/// Stores cryptographic key material as binary files in a configured directory.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Хранилище не различает алгоритмы и работает с данными как с бинарными
-/// записями. На Unix каталог хранения принудительно ограничивается правами
-/// владельца <c>rwx------</c>, а файлы записей — <c>rw-------</c>.
-/// На остальных платформах дополнительная защита каталога и файлов
-/// обеспечивается средствами операционной системы.
+/// The storage is algorithm-agnostic. On Unix-like platforms, the storage directory
+/// is constrained to <c>rwx------</c> and key files to <c>rw-------</c>.
 /// </para>
 /// <para>
-/// Логический идентификатор записи не используется как имя файла напрямую.
-/// Имя файла формируется как SHA-256 от UTF-8 представления идентификатора,
-/// что обеспечивает одинаковое отображение на поддерживаемых платформах.
+/// Logical identifiers are never used as file names directly. Each identifier is
+/// encoded as the SHA-256 hash of its strict UTF-8 representation.
 /// </para>
 /// <para>
-/// Создание и замена выполняются через временный файл в том же каталоге.
-/// Атомарное создание только при отсутствии записи обеспечивается вызовом
-/// <see cref="File.Move(string,string,bool)"/> с запрещённой заменой, без
-/// предварительной проверки существования и без локальной блокировки процесса.
+/// Create and replace operations write to a temporary file in the same directory
+/// before publishing the result. Create-only publication uses
+/// <see cref="File.Move(string,string,bool)"/> with overwrite disabled so correctness
+/// does not depend on a prior existence check or an in-process lock.
 /// </para>
 /// </remarks>
 public sealed class FileKeyStorage : IKeyStorage
@@ -48,14 +43,17 @@ public sealed class FileKeyStorage : IKeyStorage
     private readonly FileKeyStorageTestHooks? _testHooks;
 
     /// <summary>
-    /// Создаёт файловое хранилище ключей.
+    /// Creates a file-backed key storage instance.
     /// </summary>
-    /// <param name="options">Настройки файлового хранилища.</param>
+    /// <param name="options">The validated file-storage configuration.</param>
     public FileKeyStorage(FileKeyStorageOptions options)
         : this(options, testHooks: null)
     {
     }
 
+    /// <summary>
+    /// Creates a file-backed key storage instance with optional internal test hooks.
+    /// </summary>
     internal FileKeyStorage(
         FileKeyStorageOptions options,
         FileKeyStorageTestHooks? testHooks)
@@ -101,8 +99,8 @@ public sealed class FileKeyStorage : IKeyStorage
             if (length > _maximumEntrySizeBytes)
             {
                 throw new InvalidDataException(
-                    $"Размер записи ключа '{keyId}' ({length} байт) превышает " +
-                    $"допустимый предел {_maximumEntrySizeBytes} байт.");
+                    $"Key record '{keyId}' is {length} bytes, which exceeds " +
+                    $"the configured limit of {_maximumEntrySizeBytes} bytes.");
             }
 
             var data = GC.AllocateUninitializedArray<byte>(
@@ -155,8 +153,8 @@ public sealed class FileKeyStorage : IKeyStorage
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            // Закрываем файловый дескриптор до атомарной публикации файла.
-            // На Windows переименование открытого файла может завершиться ошибкой.
+            // Close the descriptor before atomic publication. Renaming an open file can
+            // fail on Windows even when the same sequence succeeds on Unix-like systems.
             await temporaryFile.Stream
                 .DisposeAsync()
                 .ConfigureAwait(false);
@@ -166,7 +164,7 @@ public sealed class FileKeyStorage : IKeyStorage
                 FileKeyStorageOperation.Create,
                 keyId);
 
-            // Последняя проверка отмены перед необратимой публикацией записи.
+            // This is the final cancellation boundary before irreversible publication.
             cancellationToken.ThrowIfCancellationRequested();
 
             var created = TryPublishCreateOnly(
@@ -179,9 +177,8 @@ public sealed class FileKeyStorage : IKeyStorage
                 return false;
             }
 
-            // После успешного File.Move основная запись уже опубликована.
-            // Последующая отмена или диагностические тестовые обработчики
-            // не должны менять результат операции.
+            // After File.Move succeeds, the record is already committed. Later cancellation
+            // or diagnostic test hooks must not change the externally reported result.
             InvokeAfterCommitBestEffort(
                 FileKeyStorageOperation.Create,
                 keyId);
@@ -226,8 +223,7 @@ public sealed class FileKeyStorage : IKeyStorage
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            // Закрываем файловый дескриптор до атомарной замены файла.
-            // На Windows замена открытого файла может завершиться ошибкой.
+            // Close the descriptor before replacement for Windows compatibility.
             await temporaryFile.Stream
                 .DisposeAsync()
                 .ConfigureAwait(false);
@@ -241,8 +237,8 @@ public sealed class FileKeyStorage : IKeyStorage
 
             try
             {
-                // File.Replace требует существующий целевой файл и поэтому
-                // не превращает замену в неявное создание записи.
+                // File.Replace requires an existing destination and therefore cannot
+                // accidentally turn replace semantics into create semantics.
                 File.Replace(
                     temporaryFile.Path,
                     path,
@@ -260,6 +256,7 @@ public sealed class FileKeyStorage : IKeyStorage
                     keyId,
                     exception);
             }
+
             InvokeAfterCommitBestEffort(
                 FileKeyStorageOperation.Replace,
                 keyId);
@@ -289,11 +286,10 @@ public sealed class FileKeyStorage : IKeyStorage
         var path = GetKeyPath(keyId);
         EnsureExistingKeyFilePermissions(path);
 
-        // File.Delete идемпотентен для отсутствующего файла, поэтому
-        // отдельная проверка File.Exists не требуется.
+        // File.Delete is idempotent for a missing file, so no File.Exists pre-check is needed.
 
-        // Тестовый обработчик вызывается до последней проверки отмены, чтобы
-        // тесты могли детерминированно проверить границу необратимого удаления.
+        // Invoke the hook before the last cancellation check so tests can deterministically
+        // exercise the irreversible-delete boundary.
         InvokeBeforeCommit(
             FileKeyStorageOperation.Delete,
             keyId);
@@ -306,11 +302,11 @@ public sealed class FileKeyStorage : IKeyStorage
         }
         catch (DirectoryNotFoundException)
         {
-            // Отсутствующий каталог эквивалентен отсутствующей записи.
+            // A missing directory is equivalent to a missing record for delete semantics.
         }
 
-        // После File.Delete больше не проверяем токен отмены: файл уже мог быть
-        // удалён, и OperationCanceledException исказил бы фактический результат.
+        // Do not check cancellation after File.Delete: the record may already be gone, and
+        // reporting cancellation would misrepresent the completed side effect.
         InvokeAfterCommitBestEffort(
             FileKeyStorageOperation.Delete,
             keyId);
@@ -318,6 +314,13 @@ public sealed class FileKeyStorage : IKeyStorage
         return ValueTask.CompletedTask;
     }
 
+    /// <summary>
+    /// Atomically publishes a temporary file only when the destination does not exist.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> when this call published the record; otherwise
+    /// <see langword="false"/> when another participant already owns the destination.
+    /// </returns>
     private static bool TryPublishCreateOnly(
         string temporaryPath,
         string destinationPath,
@@ -338,19 +341,17 @@ public sealed class FileKeyStorage : IKeyStorage
             }
             catch (IOException)
             {
-                // File.Move использует IOException как для конфликта имени,
-                // так и для других ошибок ввода-вывода. Если целевая запись
-                // всё ещё существует, другой участник выиграл создание.
+                // File.Move reports IOException both for destination conflicts and for other
+                // I/O failures. If the destination still exists, another participant won.
                 if (File.Exists(destinationPath))
                 {
                     EnsureExistingKeyFilePermissions(destinationPath);
                     return false;
                 }
 
-                // Запись могла существовать в момент File.Move, но быть удалена
-                // до проверки File.Exists. В этом случае ограниченно повторяем
-                // ту же атомарную публикацию. Реальная постоянная I/O-ошибка
-                // после нескольких попыток не скрывается и выходит наружу.
+                // The destination may have existed when File.Move failed and then been deleted
+                // before File.Exists ran. Retry the same atomic publish a bounded number of times;
+                // a persistent I/O failure is rethrown instead of being hidden indefinitely.
                 if (retryCount >= MaximumCreatePublishRetries)
                 {
                     throw;
@@ -362,6 +363,9 @@ public sealed class FileKeyStorage : IKeyStorage
         }
     }
 
+    /// <summary>
+    /// Creates a uniquely named temporary file in the storage directory.
+    /// </summary>
     private TemporaryFile CreateTemporaryFile(
         CancellationToken cancellationToken)
     {
@@ -390,23 +394,24 @@ public sealed class FileKeyStorage : IKeyStorage
             }
             catch (IOException exception)
             {
-                // FileMode.CreateNew сообщает IOException как при коллизии имени,
-                // так и при некоторых других ошибках ввода-вывода. Проверка
-                // File.Exists после исключения сама была бы подвержена гонке:
-                // конкурирующий процесс может удалить файл до этой проверки.
+                // FileMode.CreateNew uses IOException for both name collisions and other I/O
+                // failures. Classifying the exception with File.Exists would introduce another
+                // race because the conflicting file could disappear before that check.
                 //
-                // Поэтому ограниченно повторяем попытку с новым именем для любого
-                // IOException. Постоянная ошибка не скрывается: после исчерпания
-                // попыток последнее исключение сохраняется как InnerException.
+                // Retry with another name for any IOException. If all attempts fail, preserve
+                // the final IOException as the inner exception of the public failure.
                 lastIOException = exception;
             }
         }
 
         throw new IOException(
-            "Не удалось создать временный файл для записи ключа.",
+            "Failed to create a temporary file for key storage.",
             lastIOException);
     }
 
+    /// <summary>
+    /// Builds the file options used for temporary key records.
+    /// </summary>
     private static FileStreamOptions CreateTemporaryFileOptions()
     {
         var options = new FileStreamOptions
@@ -426,6 +431,10 @@ public sealed class FileKeyStorage : IKeyStorage
         return options;
     }
 
+    /// <summary>
+    /// Disposes a temporary stream without allowing cleanup failure to mask the
+    /// primary operation result.
+    /// </summary>
     private static async ValueTask DisposeTemporaryStreamBestEffortAsync(
         FileStream stream)
     {
@@ -437,10 +446,13 @@ public sealed class FileKeyStorage : IKeyStorage
         }
         catch (Exception)
         {
-            // Ошибка вспомогательной очистки не должна скрывать исходный результат.
+            // Best-effort cleanup must not hide the original result or exception.
         }
     }
 
+    /// <summary>
+    /// Writes and flushes a complete temporary key record.
+    /// </summary>
     private static async ValueTask WriteTemporaryFileAsync(
         FileStream stream,
         ReadOnlyMemory<byte> data,
@@ -455,6 +467,9 @@ public sealed class FileKeyStorage : IKeyStorage
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Ensures the storage directory exists and applies the required Unix mode when supported.
+    /// </summary>
     private void EnsureDirectoryExists()
     {
         if (!SupportsUnixFileMode())
@@ -470,6 +485,9 @@ public sealed class FileKeyStorage : IKeyStorage
         EnsureUnixDirectoryPermissions();
     }
 
+    /// <summary>
+    /// Reapplies required Unix permissions to an existing storage directory.
+    /// </summary>
     private void EnsureExistingDirectoryPermissions()
     {
         if (!SupportsUnixFileMode() ||
@@ -486,11 +504,14 @@ public sealed class FileKeyStorage : IKeyStorage
             when (exception is FileNotFoundException
                 or DirectoryNotFoundException)
         {
-            // Каталог мог быть удалён конкурентной операцией между
-            // Directory.Exists и чтением или изменением его Unix-прав.
+            // A concurrent operation may remove the directory between Directory.Exists
+            // and the permission read or write. Treat that disappearance as benign here.
         }
     }
 
+    /// <summary>
+    /// Sets the storage directory to the owner-only Unix mode required by CryptoKit.
+    /// </summary>
     private void EnsureUnixDirectoryPermissions()
     {
         var currentMode = File.GetUnixFileMode(_directoryPath);
@@ -505,6 +526,9 @@ public sealed class FileKeyStorage : IKeyStorage
             RequiredDirectoryUnixMode);
     }
 
+    /// <summary>
+    /// Reapplies owner-only Unix permissions to an existing key file when supported.
+    /// </summary>
     private static void EnsureExistingKeyFilePermissions(string path)
     {
         if (!SupportsUnixFileMode())
@@ -529,11 +553,13 @@ public sealed class FileKeyStorage : IKeyStorage
             when (exception is FileNotFoundException
                 or DirectoryNotFoundException)
         {
-            // Запись могла отсутствовать изначально или быть удалена
-            // конкурентной операцией между проверкой прав и их изменением.
+            // The record may be absent or may disappear between permission inspection and update.
         }
     }
 
+    /// <summary>
+    /// Invokes the deterministic pre-commit test hook when configured.
+    /// </summary>
     private void InvokeBeforeCommit(
         FileKeyStorageOperation operation,
         string keyId)
@@ -543,6 +569,10 @@ public sealed class FileKeyStorage : IKeyStorage
             keyId);
     }
 
+    /// <summary>
+    /// Invokes the post-commit test hook without allowing diagnostic failures to
+    /// change the result of an already committed storage operation.
+    /// </summary>
     private void InvokeAfterCommitBestEffort(
         FileKeyStorageOperation operation,
         string keyId)
@@ -555,11 +585,13 @@ public sealed class FileKeyStorage : IKeyStorage
         }
         catch (Exception)
         {
-            // После изменения основной записи ошибка тестового обработчика
-            // не должна менять результат уже завершённой операции.
+            // The primary record has already changed; a test-hook failure must not rewrite history.
         }
     }
 
+    /// <summary>
+    /// Deletes a temporary file without masking the primary operation result.
+    /// </summary>
     private void TryDeleteTemporaryFile(string path)
     {
         try
@@ -569,10 +601,13 @@ public sealed class FileKeyStorage : IKeyStorage
         }
         catch (Exception)
         {
-            // Ошибка вспомогательной очистки не должна скрывать уже известный результат.
+            // Temporary cleanup is best effort once the main operation result is known.
         }
     }
 
+    /// <summary>
+    /// Maps a logical key identifier to its hashed file-system path.
+    /// </summary>
     private string GetKeyPath(string keyId)
     {
         var fileName = FileKeyNameEncoder.Encode(keyId);
@@ -582,44 +617,59 @@ public sealed class FileKeyStorage : IKeyStorage
             fileName + FileExtension);
     }
 
+    /// <summary>
+    /// Validates storage payload size before any file-system mutation occurs.
+    /// </summary>
     private void ValidateData(ReadOnlyMemory<byte> data)
     {
         if (data.IsEmpty)
         {
             throw new ArgumentException(
-                "Данные ключа не могут быть пустыми.",
+                "Key data cannot be empty.",
                 nameof(data));
         }
 
         if (data.Length > _maximumEntrySizeBytes)
         {
             throw new ArgumentException(
-                $"Размер данных ключа ({data.Length} байт) превышает " +
-                $"допустимый предел {_maximumEntrySizeBytes} байт.",
+                $"Key data size ({data.Length} bytes) exceeds " +
+                $"the configured limit of {_maximumEntrySizeBytes} bytes.",
                 nameof(data));
         }
     }
 
+    /// <summary>
+    /// Creates the storage-level missing-record exception used by replace operations.
+    /// </summary>
     private static KeyNotFoundException CreateMissingKeyException(
         string keyId,
         Exception innerException)
     {
         return new KeyNotFoundException(
-            $"Ключ с идентификатором '{keyId}' не найден.",
+            $"Key '{keyId}' was not found.",
             innerException);
     }
 
+    /// <summary>
+    /// Returns whether Unix file-mode APIs are applicable on the current platform.
+    /// </summary>
     [UnsupportedOSPlatformGuard("windows")]
     private static bool SupportsUnixFileMode()
     {
         return !OperatingSystem.IsWindows();
     }
 
+    /// <summary>
+    /// Couples a temporary file path with its open stream during staged writes.
+    /// </summary>
     private readonly record struct TemporaryFile(
         string Path,
         FileStream Stream);
 }
 
+/// <summary>
+/// Internal hooks used to make commit boundaries and failure scenarios deterministic in tests.
+/// </summary>
 internal sealed class FileKeyStorageTestHooks
 {
     internal Func<string>? TemporaryFileNameFactory { get; init; }
@@ -631,6 +681,9 @@ internal sealed class FileKeyStorageTestHooks
     internal Action<string>? BeforeTemporaryCleanup { get; init; }
 }
 
+/// <summary>
+/// Identifies the file-storage operation currently crossing a testable commit boundary.
+/// </summary>
 internal enum FileKeyStorageOperation
 {
     Create,

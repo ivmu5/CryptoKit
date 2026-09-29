@@ -3,23 +3,20 @@ using System.Security.Cryptography;
 namespace CryptoKit.Rsa;
 
 /// <summary>
-/// Выполняет создание новых пар RSA-ключей.
+/// Generates RSA private/public key pairs.
 /// </summary>
 public sealed class RsaKeyGenerator
 {
     /// <summary>
-    /// Создаёт новую пару RSA-ключей.
+    /// Generates a new RSA key pair.
     /// </summary>
-    /// <param name="keySize">
-    /// Размер RSA-ключа в битах.
-    /// </param>
+    /// <param name="keySize">The RSA key size in bits.</param>
     /// <returns>
-    /// Новая пара закрытого и открытого RSA-ключей.
-    /// Вызывающий код обязан освободить её через <see cref="IDisposable.Dispose"/>.
+    /// A new caller-owned RSA key pair. The caller must dispose it after use.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// Возникает, если размер RSA-ключа меньше минимально допустимого
-    /// либо не поддерживается текущей реализацией RSA.
+    /// <paramref name="keySize"/> is below the CryptoKit minimum or is not supported
+    /// by the current RSA implementation.
     /// </exception>
     public RsaKeyPair Generate(int keySize = 3072)
     {
@@ -29,13 +26,12 @@ public sealed class RsaKeyGenerator
 
         using var rsa = RSA.Create(keySize);
 
-        // Экспортируем закрытый ключ в стандартном формате PKCS#8.
+        // PKCS#8 is used as the persisted/private representation throughout CryptoKit.
         var privateKey = rsa.ExportPkcs8PrivateKey();
 
         try
         {
-            // Экспортируем только открытую часть ключа
-            // в стандартном публичном формате.
+            // SubjectPublicKeyInfo contains only the public portion of the RSA key.
             var publicKey = rsa.ExportSubjectPublicKeyInfo();
 
             return new RsaKeyPair(
@@ -44,8 +40,7 @@ public sealed class RsaKeyGenerator
         }
         finally
         {
-            // RsaKeyPair создаёт собственную копию закрытого ключа,
-            // поэтому временный массив после создания пары можно очистить.
+            // RsaKeyPair owns a copy, so the temporary private-key buffer can be cleared.
             CryptographicOperations.ZeroMemory(privateKey);
         }
     }

@@ -3,23 +3,21 @@ using System.Security.Cryptography;
 namespace CryptoKit.Aes;
 
 /// <summary>
-/// Выполняет создание новых AES-ключей.
+/// Generates cryptographically random AES keys.
 /// </summary>
 public sealed class AesKeyGenerator
 {
     /// <summary>
-    /// Создаёт новый криптографически стойкий AES-ключ.
+    /// Generates a new AES key of the requested size.
     /// </summary>
     /// <param name="keySize">
-    /// Размер AES-ключа в битах.
-    /// Допустимые значения: 128, 192 или 256.
+    /// The key size in bits. Supported values are 128, 192, and 256.
     /// </param>
     /// <returns>
-    /// Новый AES-ключ.
-    /// Вызывающий код обязан освободить его через <see cref="IDisposable.Dispose"/>.
+    /// A new caller-owned AES key that must be disposed after use.
     /// </returns>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// Возникает, если указан недопустимый размер AES-ключа.
+    /// <paramref name="keySize"/> is not a supported AES key size.
     /// </exception>
     public AesKey Generate(int keySize = 256)
     {
@@ -27,8 +25,7 @@ public sealed class AesKeyGenerator
             keySize,
             nameof(keySize));
 
-        // Для AES размер ключа задаётся в битах,
-        // а генератор случайных данных принимает количество байт.
+        // AES sizes are expressed in bits, while RandomNumberGenerator expects a byte count.
         var keyData = RandomNumberGenerator.GetBytes(
             keySize / 8);
 
@@ -38,10 +35,8 @@ public sealed class AesKeyGenerator
         }
         finally
         {
-            // AesKey сохраняет собственную копию,
-            // поэтому временный массив можно очистить.
+            // AesKey owns a copy, so the temporary generation buffer can be cleared immediately.
             CryptographicOperations.ZeroMemory(keyData);
         }
     }
 }
-

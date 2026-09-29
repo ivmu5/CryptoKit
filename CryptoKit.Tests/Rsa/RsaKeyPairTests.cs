@@ -4,6 +4,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Rsa;
 
+/// <summary>
+/// Verifies RSA key-pair validation, ownership, export, and disposal behavior.
+/// </summary>
 public sealed class RsaKeyPairTests
 {
     [Fact]

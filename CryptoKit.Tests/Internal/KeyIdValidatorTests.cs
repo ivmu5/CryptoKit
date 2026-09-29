@@ -3,6 +3,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Internal;
 
+/// <summary>
+/// Verifies logical key-identifier validation, including malformed UTF-16 input.
+/// </summary>
 public sealed class KeyIdValidatorTests
 {
     [Theory]

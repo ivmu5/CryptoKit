@@ -3,60 +3,55 @@ using System.Security.Cryptography;
 namespace CryptoKit.Aes;
 
 /// <summary>
-/// Определяет асинхронный источник AES-ключей.
+/// Defines an asynchronous source of persisted AES keys.
 /// </summary>
 public interface IAesKeyProvider
 {
     /// <summary>
-    /// Асинхронно получает существующий AES-ключ
-    /// по указанному идентификатору.
+    /// Loads an existing AES key by its logical identifier.
     /// </summary>
-    /// <param name="keyId">
-    /// Уникальный логический идентификатор AES-ключа.
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены ожидания хранилища.
-    /// </param>
+    /// <param name="keyId">The logical AES key identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel storage waits.</param>
     /// <returns>
-    /// Новый экземпляр существующего AES-ключа, принадлежащий вызывающему коду.
-    /// Вызывающий код обязан вызвать <see cref="IDisposable.Dispose"/>
-    /// после завершения работы с ключевым материалом.
+    /// A new caller-owned instance containing the stored AES key material.
+    /// The caller must dispose the returned key after use.
     /// </returns>
     /// <exception cref="KeyNotFoundException">
-    /// Ключ с указанным идентификатором отсутствует.
+    /// No key exists for <paramref name="keyId"/>.
     /// </exception>
     /// <exception cref="CryptographicException">
-    /// Сохранённый AES-ключ содержит недопустимый ключевой материал.
+    /// Stored key material is invalid for AES.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// The operation is canceled before completion.
     /// </exception>
     ValueTask<AesKey> GetKeyAsync(
         string keyId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Асинхронно получает существующий AES-ключ либо атомарно создаёт новый,
-    /// если запись с указанным идентификатором отсутствует.
+    /// Loads an existing AES key or atomically creates one when no record exists.
     /// </summary>
-    /// <param name="keyId">
-    /// Уникальный логический идентификатор AES-ключа.
-    /// </param>
+    /// <param name="keyId">The logical AES key identifier.</param>
     /// <param name="cancellationToken">
-    /// Токен отмены ожидания хранилища или создания ключа.
+    /// A token used to cancel storage waits or key creation before commit.
     /// </param>
     /// <returns>
-    /// Новый экземпляр AES-ключа, принадлежащий вызывающему коду.
-    /// Вызывающий код обязан вызвать <see cref="IDisposable.Dispose"/>
-    /// после завершения работы с ключевым материалом.
+    /// A new caller-owned AES key instance. The caller must dispose it after use.
     /// </returns>
     /// <remarks>
-    /// Этот метод явно разрешает создание нового ключевого материала.
-    /// Для получения только ранее существовавшего ключа используйте
-    /// <see cref="GetKeyAsync"/>.
+    /// This method explicitly permits creation of new secret key material. Use
+    /// <see cref="GetKeyAsync"/> when only previously provisioned material is acceptable.
     /// </remarks>
     /// <exception cref="CryptographicException">
-    /// Существующая запись AES-ключа содержит недопустимый ключевой материал.
+    /// Existing stored material is invalid for AES.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Не удалось завершить создание из-за непрерывных конкурентных изменений записи.
+    /// Creation cannot converge because the same storage record is continuously
+    /// changed by competing operations.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// The operation is canceled before completion.
     /// </exception>
     ValueTask<AesKey> GetOrCreateKeyAsync(
         string keyId,

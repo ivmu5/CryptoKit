@@ -3,6 +3,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Internal;
 
+/// <summary>
+/// Verifies per-key serialization, cancellation cleanup, and lease idempotency.
+/// </summary>
 public sealed class KeyedLockTests
 {
     [Fact]
@@ -14,7 +17,7 @@ public sealed class KeyedLockTests
 
         try
         {
-            // Второй захват того же ключа должен ждать освобождения первого.
+            // A second lease for the same key must wait until the first lease is released.
             var pending = keyedLock.AcquireAsync("same").AsTask();
 
             Assert.False(pending.IsCompleted);
@@ -63,8 +66,7 @@ public sealed class KeyedLockTests
             first.Dispose();
         }
 
-        // После отменённого waiter счётчик ссылок должен быть восстановлен,
-        // и новый захват должен работать нормально.
+        // A canceled waiter must release its reference so a later acquisition can proceed.
         using var next = await keyedLock
             .AcquireAsync("same")
             .AsTask()

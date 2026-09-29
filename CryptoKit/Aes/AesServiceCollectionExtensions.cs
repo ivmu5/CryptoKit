@@ -5,29 +5,21 @@ using Microsoft.Extensions.DependencyInjection;
 namespace CryptoKit.Aes;
 
 /// <summary>
-/// Содержит методы расширения для регистрации AES-компонентов CryptoKit.
+/// Provides dependency-injection registration for CryptoKit AES services.
 /// </summary>
 public static class AesServiceCollectionExtensions
 {
     /// <summary>
-    /// Добавляет генератор и провайдер AES-ключей
-    /// в коллекцию сервисов приложения.
+    /// Registers the AES key generator and key provider.
     /// </summary>
-    /// <param name="services">
-    /// Коллекция сервисов приложения.
-    /// </param>
+    /// <param name="services">The application service collection.</param>
     /// <param name="configure">
-    /// Необязательная настройка параметров создаваемых AES-ключей.
+    /// An optional callback used to configure newly generated AES keys.
     /// </param>
-    /// <returns>
-    /// Исходная коллекция сервисов для возможности цепочного вызова методов.
-    /// </returns>
+    /// <returns>The original service collection.</returns>
     /// <remarks>
-    /// Перед использованием AES в контейнере должна быть зарегистрирована
-    /// реализация <see cref="IKeyStorage"/>.
-    ///
-    /// Один зарегистрированный провайдер может работать
-    /// с несколькими AES-ключами по разным идентификаторам.
+    /// An <see cref="IKeyStorage"/> implementation must be registered before the
+    /// provider is resolved. A single provider can manage multiple logical AES keys.
     /// </remarks>
     public static IServiceCollection AddCryptoKitAes(
         this IServiceCollection services,
@@ -40,8 +32,8 @@ public static class AesServiceCollectionExtensions
 
         AesKeyOptionsValidator.Validate(configuredOptions);
 
-        // Провайдер получает отдельный снимок настроек. Изменяемый объект,
-        // переданный в configure, не сохраняется и не публикуется через DI.
+        // Capture an immutable snapshot so later mutation of the caller's options object
+        // cannot alter the lifetime behavior of the registered singleton provider.
         var options = new AesKeyOptions
         {
             KeySize = configuredOptions.KeySize

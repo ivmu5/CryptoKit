@@ -4,8 +4,8 @@ using CryptoKit.Storage;
 namespace CryptoKit.Tests.Helpers;
 
 /// <summary>
-/// Простая потокобезопасная реализация IKeyStorage только для unit-тестов.
-/// Она позволяет проверять провайдеры ключей без обращения к файловой системе.
+/// Thread-safe in-memory IKeyStorage implementation used by unit tests to exercise
+/// key providers without touching the file system.
 /// </summary>
 internal sealed class InMemoryKeyStorage : IKeyStorage, IDisposable
 {
@@ -13,6 +13,7 @@ internal sealed class InMemoryKeyStorage : IKeyStorage, IDisposable
     private readonly Dictionary<string, byte[]> _entries =
         new(StringComparer.Ordinal);
 
+    /// <inheritdoc />
     public ValueTask<byte[]?> TryLoadAsync(
         string keyId,
         CancellationToken cancellationToken = default)
@@ -28,6 +29,7 @@ internal sealed class InMemoryKeyStorage : IKeyStorage, IDisposable
         }
     }
 
+    /// <inheritdoc />
     public ValueTask<bool> CreateAsync(
         string keyId,
         ReadOnlyMemory<byte> data,
@@ -50,6 +52,7 @@ internal sealed class InMemoryKeyStorage : IKeyStorage, IDisposable
         }
     }
 
+    /// <inheritdoc />
     public ValueTask ReplaceAsync(
         string keyId,
         ReadOnlyMemory<byte> data,
@@ -74,6 +77,7 @@ internal sealed class InMemoryKeyStorage : IKeyStorage, IDisposable
         return ValueTask.CompletedTask;
     }
 
+    /// <inheritdoc />
     public ValueTask DeleteAsync(
         string keyId,
         CancellationToken cancellationToken = default)
@@ -92,8 +96,8 @@ internal sealed class InMemoryKeyStorage : IKeyStorage, IDisposable
     }
 
     /// <summary>
-    /// Заменяет единственную запись хранилища произвольными данными.
-    /// Удобно для проверки поведения провайдеров при повреждённом key material.
+    /// Replaces the only stored record with arbitrary bytes so provider behavior can
+    /// be tested against corrupted key material.
     /// </summary>
     internal void ReplaceOnlyEntry(ReadOnlySpan<byte> data)
     {
@@ -109,6 +113,9 @@ internal sealed class InMemoryKeyStorage : IKeyStorage, IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the number of records currently held by the fake storage.
+    /// </summary>
     internal int Count
     {
         get
@@ -120,6 +127,9 @@ internal sealed class InMemoryKeyStorage : IKeyStorage, IDisposable
         }
     }
 
+    /// <summary>
+    /// Clears all retained key buffers and removes every in-memory record.
+    /// </summary>
     public void Dispose()
     {
         lock (_syncRoot)

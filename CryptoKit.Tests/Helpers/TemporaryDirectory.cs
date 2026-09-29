@@ -1,10 +1,13 @@
 namespace CryptoKit.Tests.Helpers;
 
 /// <summary>
-/// Временный каталог для filesystem-тестов.
+/// Provides an isolated temporary directory for file-system tests.
 /// </summary>
 internal sealed class TemporaryDirectory : IDisposable
 {
+    /// <summary>
+    /// Creates a new unique directory under the process temporary path.
+    /// </summary>
     internal TemporaryDirectory()
     {
         Path = System.IO.Path.Combine(
@@ -15,8 +18,14 @@ internal sealed class TemporaryDirectory : IDisposable
         Directory.CreateDirectory(Path);
     }
 
+    /// <summary>
+    /// Gets the temporary directory path.
+    /// </summary>
     internal string Path { get; }
 
+    /// <summary>
+    /// Best-effort deletes the temporary directory and all of its contents.
+    /// </summary>
     public void Dispose()
     {
         try
@@ -28,7 +37,7 @@ internal sealed class TemporaryDirectory : IDisposable
         }
         catch
         {
-            // Очистка тестового каталога не должна скрывать результат самого теста.
+            // Test-directory cleanup must not hide the result of the test itself.
         }
     }
 }

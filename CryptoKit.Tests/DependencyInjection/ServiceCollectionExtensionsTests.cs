@@ -8,6 +8,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.DependencyInjection;
 
+/// <summary>
+/// Verifies dependency-injection registration and option snapshot behavior.
+/// </summary>
 public sealed class ServiceCollectionExtensionsTests
 {
     [Fact]
@@ -69,8 +72,8 @@ public sealed class ServiceCollectionExtensionsTests
             options.KeySize = 128;
         });
 
-        // После регистрации меняем объект, который был доступен configure.
-        // Провайдер не должен увидеть это изменение: extension делает снимок.
+        // Mutate the object exposed to configure after registration. The provider must not
+        // observe this change because the registration extension captures a snapshot.
         configuredOptions!.KeySize = 256;
 
         using var serviceProvider = services.BuildServiceProvider();

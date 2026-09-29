@@ -6,6 +6,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Hmac;
 
+/// <summary>
+/// Verifies HMAC provider persistence, validation, and creation races.
+/// </summary>
 public sealed class HmacKeyProviderTests
 {
     [Fact]

@@ -3,116 +3,106 @@ using System.Security.Cryptography;
 namespace CryptoKit.Rsa;
 
 /// <summary>
-/// Определяет асинхронный источник RSA-ключей.
+/// Defines an asynchronous source of persisted RSA key pairs and derived public keys.
 /// </summary>
 public interface IRsaKeyProvider
 {
     /// <summary>
-    /// Асинхронно получает существующую пару RSA-ключей
-    /// по указанному идентификатору.
+    /// Loads an existing RSA key pair by its logical identifier.
     /// </summary>
-    /// <param name="keyId">
-    /// Уникальный идентификатор пары RSA-ключей.
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены ожидания хранилища.
-    /// </param>
+    /// <param name="keyId">The logical RSA key-pair identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel storage waits.</param>
     /// <returns>
-    /// Новый экземпляр существующей RSA-пары, принадлежащий вызывающему коду.
-    /// Вызывающий код обязан вызвать <see cref="IDisposable.Dispose"/>
-    /// после завершения работы с материалом закрытого ключа.
+    /// A new caller-owned RSA key pair. The caller must dispose it after the private
+    /// key material is no longer required.
     /// </returns>
     /// <exception cref="KeyNotFoundException">
-    /// RSA-ключ с указанным идентификатором отсутствует.
+    /// No RSA key pair exists for <paramref name="keyId"/>.
     /// </exception>
     /// <exception cref="CryptographicException">
-    /// Сохранённый закрытый RSA-ключ имеет некорректный формат либо его размер
-    /// меньше минимально допустимого для CryptoKit.
+    /// Stored private-key material is malformed or violates the minimum RSA key-size policy.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// The operation is canceled before completion.
     /// </exception>
     ValueTask<RsaKeyPair> GetKeyPairAsync(
         string keyId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Асинхронно получает существующую RSA-пару либо атомарно создаёт новую,
-    /// если ключ с указанным идентификатором отсутствует.
+    /// Loads an existing RSA key pair or atomically creates one when no record exists.
     /// </summary>
-    /// <param name="keyId">
-    /// Уникальный идентификатор пары RSA-ключей.
-    /// </param>
+    /// <param name="keyId">The logical RSA key-pair identifier.</param>
     /// <param name="cancellationToken">
-    /// Токен отмены ожидания хранилища или создания ключа.
+    /// A token used to cancel storage waits or key creation before commit.
     /// </param>
     /// <returns>
-    /// Новый экземпляр RSA-пары, принадлежащий вызывающему коду.
-    /// Вызывающий код обязан вызвать <see cref="IDisposable.Dispose"/>
-    /// после завершения работы с материалом закрытого ключа.
+    /// A new caller-owned RSA key pair. The caller must dispose it after use.
     /// </returns>
     /// <remarks>
-    /// Этот метод явно разрешает создание нового материала закрытого ключа.
-    /// Для получения только ранее существовавшей пары используйте
-    /// <see cref="GetKeyPairAsync"/>.
+    /// This method explicitly permits creation of new private-key material. Use
+    /// <see cref="GetKeyPairAsync"/> when only previously provisioned material is acceptable.
     /// </remarks>
     /// <exception cref="CryptographicException">
-    /// Существующий закрытый RSA-ключ имеет некорректный формат либо его размер
-    /// меньше минимально допустимого для CryptoKit.
+    /// Existing private-key material is malformed or violates the minimum RSA key-size policy.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Не удалось завершить создание из-за непрерывных конкурентных изменений записи.
+    /// Creation cannot converge because the same storage record is continuously
+    /// changed by competing operations.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// The operation is canceled before completion.
     /// </exception>
     ValueTask<RsaKeyPair> GetOrCreateKeyPairAsync(
         string keyId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Асинхронно получает открытый ключ существующей RSA-пары,
-    /// не предоставляя вызывающему коду доступ к закрытому ключу.
+    /// Loads the public key derived from an existing persisted RSA private key without
+    /// exposing private-key material to the caller.
     /// </summary>
-    /// <param name="keyId">
-    /// Уникальный идентификатор пары RSA-ключей.
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены ожидания хранилища.
-    /// </param>
+    /// <param name="keyId">The logical RSA key-pair identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel storage waits.</param>
     /// <returns>
-    /// Новый массив байт, принадлежащий вызывающему коду, с открытым RSA-ключом
-    /// в формате SubjectPublicKeyInfo.
+    /// A new caller-owned byte array containing the public key in SubjectPublicKeyInfo format.
     /// </returns>
     /// <exception cref="KeyNotFoundException">
-    /// RSA-ключ с указанным идентификатором отсутствует.
+    /// No RSA key pair exists for <paramref name="keyId"/>.
     /// </exception>
     /// <exception cref="CryptographicException">
-    /// Сохранённый закрытый RSA-ключ имеет некорректный формат либо его размер
-    /// меньше минимально допустимого для CryptoKit.
+    /// Stored private-key material is malformed or violates the minimum RSA key-size policy.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// The operation is canceled before completion.
     /// </exception>
     ValueTask<byte[]> GetPublicKeyAsync(
         string keyId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Асинхронно получает открытый RSA-ключ либо создаёт новую RSA-пару,
-    /// если ключ с указанным идентификатором отсутствует.
+    /// Loads the public key for an existing RSA pair or creates and persists a new pair
+    /// when no record exists.
     /// </summary>
-    /// <param name="keyId">
-    /// Уникальный идентификатор пары RSA-ключей.
-    /// </param>
+    /// <param name="keyId">The logical RSA key-pair identifier.</param>
     /// <param name="cancellationToken">
-    /// Токен отмены ожидания хранилища или создания ключа.
+    /// A token used to cancel storage waits or key creation before commit.
     /// </param>
     /// <returns>
-    /// Новый массив байт, принадлежащий вызывающему коду, с открытым RSA-ключом
-    /// в формате SubjectPublicKeyInfo.
+    /// A new caller-owned byte array containing the public key in SubjectPublicKeyInfo format.
     /// </returns>
     /// <remarks>
-    /// Закрытый ключ новой пары сохраняется в настроенном хранилище,
-    /// но не возвращается вызывающему коду.
+    /// When creation is required, only the private key is persisted. The private key is not
+    /// returned by this method; the public key is derived from the persisted private material.
     /// </remarks>
     /// <exception cref="CryptographicException">
-    /// Существующий закрытый RSA-ключ имеет некорректный формат либо его размер
-    /// меньше минимально допустимого для CryptoKit.
+    /// Existing private-key material is malformed or violates the minimum RSA key-size policy.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Не удалось завершить создание из-за непрерывных конкурентных изменений записи.
+    /// Creation cannot converge because the same storage record is continuously
+    /// changed by competing operations.
+    /// </exception>
+    /// <exception cref="OperationCanceledException">
+    /// The operation is canceled before completion.
     /// </exception>
     ValueTask<byte[]> GetOrCreatePublicKeyAsync(
         string keyId,

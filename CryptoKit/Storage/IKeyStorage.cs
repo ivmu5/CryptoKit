@@ -1,68 +1,64 @@
 namespace CryptoKit.Storage;
 
 /// <summary>
-/// Определяет асинхронное универсальное хранилище бинарного
-/// криптографического ключевого материала.
+/// Defines an asynchronous, algorithm-agnostic storage contract for binary
+/// cryptographic key material.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Хранилище не зависит от конкретного алгоритма и может использоваться
-/// для RSA, AES, HMAC и других типов ключевого материала.
+/// The storage does not depend on a particular algorithm and can hold RSA, AES,
+/// HMAC, or other key material.
 /// </para>
 /// <para>
-/// Контракт разделяет создание и замену записи. Реализация обязана обеспечивать
-/// атомарное создание только при отсутствии записи и не должна эмулировать его
-/// предварительной проверкой существования.
+/// Create and replace semantics are intentionally separate. Implementations must
+/// provide atomic create-only behavior and must not emulate it with a prior existence check.
 /// </para>
 /// <para>
-/// Асинхронный контракт позволяет реализациям работать с файловой системой,
-/// SecureStorage, Keychain, KMS и другими внешними источниками без синхронных
-/// обёрток над асинхронными вызовами внутри CryptoKit.
+/// The asynchronous contract allows backends such as file systems, secure stores,
+/// keychains, or remote KMS implementations without introducing synchronous wrappers.
 /// </para>
 /// </remarks>
 public interface IKeyStorage
 {
     /// <summary>
-    /// Асинхронно пытается загрузить запись с указанным идентификатором.
+    /// Attempts to load a record by its logical storage identifier.
     /// </summary>
-    /// <param name="keyId">Уникальный идентификатор записи.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <param name="keyId">The unique storage identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation.</param>
     /// <returns>
-    /// Новый массив с данными записи, принадлежащий вызывающему коду, либо <see langword="null"/>,
-    /// если запись отсутствует.
+    /// A new caller-owned byte array containing the record, or <see langword="null"/>
+    /// when the record does not exist.
     /// </returns>
     /// <remarks>
-    /// Если возвращённый массив содержит секретный материал, вызывающий код
-    /// обязан очистить его после завершения использования.
+    /// If the returned array contains secret material, the caller is responsible for
+    /// clearing it after use.
     /// </remarks>
     ValueTask<byte[]?> TryLoadAsync(
         string keyId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Асинхронно создаёт новую запись, только если она ещё не существует.
+    /// Atomically creates a new record only when no record with the same identifier exists.
     /// </summary>
-    /// <param name="keyId">Уникальный идентификатор записи.</param>
+    /// <param name="keyId">The unique storage identifier.</param>
     /// <param name="data">
-    /// Данные записи. После завершения вызова реализация не должна сохранять
-    /// ссылку на память, принадлежащую вызывающему коду.
+    /// The record bytes. The implementation must not retain a reference to caller-owned memory
+    /// after the operation completes.
     /// </param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation before commit.</param>
     /// <returns>
-    /// <see langword="true"/>, если эта операция создала запись;
-    /// <see langword="false"/>, если запись уже существовала и не была изменена.
+    /// <see langword="true"/> when this operation created the record; otherwise
+    /// <see langword="false"/> when a record already existed and was left unchanged.
     /// </returns>
     /// <remarks>
     /// <para>
-    /// Проверка отсутствия и создание должны составлять одну атомарную операцию
-    /// хранилища. Предварительный вызов <see cref="TryLoadAsync"/> не является
-    /// механизмом корректности создания только при отсутствии записи.
+    /// Absence detection and creation must form one atomic storage operation. Calling
+    /// <see cref="TryLoadAsync"/> first is not a correctness mechanism for create-only semantics.
     /// </para>
     /// <para>
-    /// Реализация может учитывать отмену только до необратимого изменения
-    /// хранилища. После успешного изменения операция не должна возвращать
-    /// <see cref="OperationCanceledException"/> только из-за последующей отмены
-    /// токена.
+    /// Cancellation may be honored only before the irreversible storage change. Once a record
+    /// has been committed, an implementation must not report cancellation solely because the
+    /// token is canceled afterward.
     /// </para>
     /// </remarks>
     ValueTask<bool> CreateAsync(
@@ -71,26 +67,26 @@ public interface IKeyStorage
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Асинхронно атомарно заменяет существующую запись.
+    /// Atomically replaces an existing record.
     /// </summary>
-    /// <param name="keyId">Уникальный идентификатор записи.</param>
+    /// <param name="keyId">The unique storage identifier.</param>
     /// <param name="data">
-    /// Новые данные записи. После завершения вызова реализация не должна
-    /// сохранять ссылку на память, принадлежащую вызывающему коду.
+    /// The replacement bytes. The implementation must not retain a reference to caller-owned
+    /// memory after the operation completes.
     /// </param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation before commit.</param>
     /// <remarks>
     /// <para>
-    /// Операция никогда не создаёт отсутствующую запись. Отсутствие записи
-    /// приводит к <see cref="KeyNotFoundException"/>.
+    /// The operation must never create a missing record. A missing destination results in
+    /// <see cref="KeyNotFoundException"/>.
     /// </para>
     /// <para>
-    /// После успешной замены операция не должна сообщать об отмене,
-    /// создавая ложное впечатление, что замена не произошла.
+    /// After a successful replacement, the implementation must not report cancellation in a
+    /// way that would falsely imply the replacement did not occur.
     /// </para>
     /// </remarks>
     /// <exception cref="KeyNotFoundException">
-    /// Запись с указанным идентификатором отсутствует.
+    /// No record exists for <paramref name="keyId"/>.
     /// </exception>
     ValueTask ReplaceAsync(
         string keyId,
@@ -98,25 +94,24 @@ public interface IKeyStorage
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Асинхронно удаляет запись с указанным идентификатором.
+    /// Deletes a record by its identifier.
     /// </summary>
-    /// <param name="keyId">Уникальный идентификатор записи.</param>
-    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <param name="keyId">The unique storage identifier.</param>
+    /// <param name="cancellationToken">A token used to cancel the operation before commit.</param>
     /// <remarks>
     /// <para>
-    /// Операция идемпотентна: отсутствие записи считается успешным результатом.
+    /// Delete is idempotent: a missing record is treated as a successful result.
     /// </para>
     /// <para>
-    /// Удаление записи из хранилища не гарантирует физическое уничтожение
-    /// предыдущего содержимого на накопителе, в снимке файловой системы или резервной копии.
+    /// Deleting a storage record does not guarantee physical erasure of previous bytes from
+    /// the underlying medium, file-system snapshots, or backups.
     /// </para>
     /// <para>
-    /// После выполнения удаления реализация не должна возвращать исключение отмены
-    /// только из-за последующей отмены токена.
+    /// Once deletion has occurred, an implementation must not report cancellation solely
+    /// because the token is canceled afterward.
     /// </para>
     /// </remarks>
     ValueTask DeleteAsync(
         string keyId,
         CancellationToken cancellationToken = default);
 }
-

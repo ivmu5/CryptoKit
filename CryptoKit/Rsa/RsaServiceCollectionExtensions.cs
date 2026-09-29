@@ -5,29 +5,21 @@ using Microsoft.Extensions.DependencyInjection;
 namespace CryptoKit.Rsa;
 
 /// <summary>
-/// Содержит методы расширения для регистрации RSA-компонентов CryptoKit.
+/// Provides dependency-injection registration for CryptoKit RSA services.
 /// </summary>
 public static class RsaServiceCollectionExtensions
 {
     /// <summary>
-    /// Добавляет генератор и провайдер RSA-ключей
-    /// в коллекцию сервисов приложения.
+    /// Registers the RSA key generator and key provider.
     /// </summary>
-    /// <param name="services">
-    /// Коллекция сервисов приложения.
-    /// </param>
+    /// <param name="services">The application service collection.</param>
     /// <param name="configure">
-    /// Необязательная настройка параметров создаваемых RSA-ключей.
+    /// An optional callback used to configure newly generated RSA key pairs.
     /// </param>
-    /// <returns>
-    /// Исходная коллекция сервисов для возможности цепочного вызова методов.
-    /// </returns>
+    /// <returns>The original service collection.</returns>
     /// <remarks>
-    /// Перед использованием RSA в контейнере должна быть зарегистрирована
-    /// реализация <see cref="IKeyStorage"/>.
-    ///
-    /// Один зарегистрированный провайдер может работать
-    /// с несколькими RSA-парами по разным идентификаторам.
+    /// An <see cref="IKeyStorage"/> implementation must be registered before the
+    /// provider is resolved. A single provider can manage multiple logical RSA key pairs.
     /// </remarks>
     public static IServiceCollection AddCryptoKitRsa(
         this IServiceCollection services,
@@ -40,8 +32,8 @@ public static class RsaServiceCollectionExtensions
 
         RsaKeyOptionsValidator.Validate(configuredOptions);
 
-        // Провайдер получает отдельный снимок настроек. Изменяемый объект,
-        // переданный в configure, не сохраняется и не публикуется через DI.
+        // Capture an immutable snapshot so later mutation of the caller's options object
+        // cannot alter the lifetime behavior of the registered singleton provider.
         var options = new RsaKeyOptions
         {
             KeySize = configuredOptions.KeySize

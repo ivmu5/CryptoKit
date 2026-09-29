@@ -1,18 +1,17 @@
 namespace CryptoKit.Aes;
 
 /// <summary>
-/// Представляет настройки создания AES-ключей.
+/// Configures generation of new AES keys.
 /// </summary>
 public sealed class AesKeyOptions
 {
     /// <summary>
-    /// Размер нового AES-ключа в битах.
-    /// Допустимые значения: 128, 192 или 256.
+    /// Gets or sets the size, in bits, of newly generated AES keys.
     /// </summary>
     /// <remarks>
-    /// Значение используется только при создании отсутствующего ключа через
-    /// <see cref="IAesKeyProvider.GetOrCreateKeyAsync"/>.
-    /// Уже существующий ключ проверяется независимо от этой настройки.
+    /// Supported values are 128, 192, and 256. This option is used only when
+    /// <see cref="IAesKeyProvider.GetOrCreateKeyAsync"/> needs to create a missing key;
+    /// existing stored key material is validated independently of this setting.
     /// </remarks>
     public int KeySize { get; set; } = 256;
 }

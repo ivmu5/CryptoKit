@@ -4,6 +4,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Rsa;
 
+/// <summary>
+/// Verifies RSA key generation and configured key sizes.
+/// </summary>
 public sealed class RsaKeyGeneratorTests
 {
     [Fact]

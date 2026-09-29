@@ -3,21 +3,18 @@ using Microsoft.Extensions.DependencyInjection;
 namespace CryptoKit.Storage;
 
 /// <summary>
-/// Содержит методы расширения для регистрации хранилищ ключей CryptoKit.
+/// Provides dependency-injection registration for CryptoKit storage backends.
 /// </summary>
 public static class StorageServiceCollectionExtensions
 {
     /// <summary>
-    /// Добавляет файловое хранилище криптографических ключей.
+    /// Registers <see cref="FileKeyStorage"/> as the application's <see cref="IKeyStorage"/>.
     /// </summary>
-    /// <param name="services">Коллекция сервисов приложения.</param>
+    /// <param name="services">The application service collection.</param>
     /// <param name="configure">
-    /// Обязательная настройка файлового хранилища.
-    /// В частности, приложение должно явно задать каталог хранения ключей.
+    /// The required configuration callback. The storage directory must be set explicitly.
     /// </param>
-    /// <returns>
-    /// Исходная коллекция сервисов для возможности цепочного вызова методов.
-    /// </returns>
+    /// <returns>The original service collection.</returns>
     public static IServiceCollection AddCryptoKitFileStorage(
         this IServiceCollection services,
         Action<FileKeyStorageOptions> configure)

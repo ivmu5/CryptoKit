@@ -3,20 +3,23 @@ using CryptoKit.Secrets;
 namespace CryptoKit.Hmac;
 
 /// <summary>
-/// Представляет секретный HMAC-ключ с явным временем жизни.
+/// Represents caller-owned HMAC key material with an explicit lifetime.
 /// </summary>
 /// <remarks>
-/// Экземпляр необходимо освобождать через <see cref="IDisposable.Dispose"/>,
-/// когда ключевой материал больше не требуется.
+/// Dispose the instance when the key material is no longer required.
 /// </remarks>
 public sealed class HmacKey : SecretKeyMaterial
 {
     /// <summary>
-    /// Создаёт объект HMAC-ключа.
+    /// Creates an HMAC key from existing key material.
     /// </summary>
-    /// <param name="value">
-    /// Бинарные данные HMAC-ключа.
-    /// </param>
+    /// <param name="value">The HMAC key bytes.</param>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="value"/> is empty.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The supplied key material is shorter than 128 bits or its size is not byte-aligned.
+    /// </exception>
     public HmacKey(ReadOnlySpan<byte> value)
         : base(CreateOwnedBuffer(value))
     {
@@ -24,16 +27,19 @@ public sealed class HmacKey : SecretKeyMaterial
     }
 
     /// <summary>
-    /// Размер HMAC-ключа в битах.
+    /// Gets the HMAC key size in bits.
     /// </summary>
     public int KeySize { get; }
 
+    /// <summary>
+    /// Validates the supplied key material and creates the buffer owned by this instance.
+    /// </summary>
     private static byte[] CreateOwnedBuffer(ReadOnlySpan<byte> value)
     {
         if (value.IsEmpty)
         {
             throw new ArgumentException(
-                "HMAC-ключ не может быть пустым.",
+                "HMAC key material cannot be empty.",
                 nameof(value));
         }
 
@@ -46,4 +52,3 @@ public sealed class HmacKey : SecretKeyMaterial
         return value.ToArray();
     }
 }
-

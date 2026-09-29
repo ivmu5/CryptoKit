@@ -4,8 +4,7 @@ using Xunit;
 namespace CryptoKit.Tests.Secrets;
 
 /// <summary>
-/// Общий контракт SecretKeyMaterial проверяем через AesKey,
-/// потому что AesKey является его публичным наследником.
+/// Verifies the shared SecretKeyMaterial contract through AesKey, a public derived type.
 /// </summary>
 public sealed class SecretKeyMaterialTests
 {

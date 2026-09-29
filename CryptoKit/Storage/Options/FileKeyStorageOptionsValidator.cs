@@ -1,7 +1,13 @@
 namespace CryptoKit.Storage;
 
+/// <summary>
+/// Validates file-storage configuration before a storage instance is created.
+/// </summary>
 internal static class FileKeyStorageOptionsValidator
 {
+    /// <summary>
+    /// Validates the directory path and record-size limit.
+    /// </summary>
     internal static void Validate(FileKeyStorageOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -9,19 +15,19 @@ internal static class FileKeyStorageOptionsValidator
         if (string.IsNullOrWhiteSpace(options.DirectoryPath))
         {
             throw new InvalidOperationException(
-                "Путь к каталогу хранения ключей должен быть задан явно.");
+                "Key storage directory path must be configured explicitly.");
         }
 
         if (options.MaximumEntrySizeBytes <= 0)
         {
             throw new InvalidOperationException(
-                "Максимальный размер записи хранилища должен быть больше нуля.");
+                "Maximum key storage record size must be greater than zero.");
         }
 
         string directoryPath;
 
-        // Проверяем возможность получить абсолютный путь заранее,
-        // чтобы ошибка конфигурации обнаружилась при создании хранилища.
+        // Resolve the absolute path up front so invalid configuration fails when the
+        // storage is constructed rather than during the first storage operation.
         try
         {
             directoryPath = Path.GetFullPath(options.DirectoryPath);
@@ -32,14 +38,14 @@ internal static class FileKeyStorageOptionsValidator
                 or PathTooLongException)
         {
             throw new InvalidOperationException(
-                $"Путь к каталогу хранения ключей '{options.DirectoryPath}' некорректен.",
+                $"Key storage directory path '{options.DirectoryPath}' is invalid.",
                 exception);
         }
 
         if (File.Exists(directoryPath))
         {
             throw new InvalidOperationException(
-                $"Путь к каталогу хранения ключей '{directoryPath}' указывает на файл.");
+                $"Key storage directory path '{directoryPath}' points to a file.");
         }
     }
 }

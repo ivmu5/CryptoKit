@@ -3,6 +3,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Aes;
 
+/// <summary>
+/// Verifies AES key generation for supported and unsupported key sizes.
+/// </summary>
 public sealed class AesKeyGeneratorTests
 {
     [Fact]

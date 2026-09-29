@@ -6,6 +6,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Aes;
 
+/// <summary>
+/// Verifies AES provider persistence, validation, cancellation, and creation races.
+/// </summary>
 public sealed class AesKeyProviderTests
 {
     [Fact]

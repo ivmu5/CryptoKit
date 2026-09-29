@@ -5,12 +5,12 @@ using CryptoKit.Storage;
 namespace CryptoKit.Rsa;
 
 /// <summary>
-/// Предоставляет асинхронный доступ к RSA-ключам через настроенное хранилище.
+/// Provides asynchronous access to persisted RSA key pairs through an
+/// <see cref="IKeyStorage"/> backend.
 /// </summary>
 /// <remarks>
-/// В хранилище сохраняется только закрытый RSA-ключ в формате PKCS#8.
-/// Открытый ключ является производным материалом и каждый раз вычисляется
-/// из сохранённого закрытого ключа.
+/// Only the private key is persisted, in PKCS#8 format. Public keys are treated as
+/// derived material and are reconstructed from the stored private key when requested.
 /// </remarks>
 public sealed class RsaKeyProvider : IRsaKeyProvider
 {
@@ -24,11 +24,11 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
         new(StringComparer.Ordinal);
 
     /// <summary>
-    /// Создаёт провайдер RSA-ключей.
+    /// Creates an RSA key provider.
     /// </summary>
-    /// <param name="storage">Асинхронное хранилище ключевого материала.</param>
-    /// <param name="generator">Генератор новых RSA-пар.</param>
-    /// <param name="options">Настройки создаваемых RSA-ключей.</param>
+    /// <param name="storage">The backend used to persist private-key material.</param>
+    /// <param name="generator">The generator used when a missing RSA pair must be created.</param>
+    /// <param name="options">The generation options captured by this provider.</param>
     public RsaKeyProvider(
         IKeyStorage storage,
         RsaKeyGenerator generator,
@@ -113,6 +113,9 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Loads and derives the public key for an existing RSA record.
+    /// </summary>
     private async ValueTask<byte[]> LoadExistingPublicKeyAsync(
         string keyId,
         CancellationToken cancellationToken)
@@ -123,9 +126,12 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
             .ConfigureAwait(false);
 
         return publicKey ?? throw new KeyNotFoundException(
-            $"RSA-пара '{keyId}' не найдена.");
+            $"RSA key pair '{keyId}' was not found.");
     }
 
+    /// <summary>
+    /// Loads a derived public key or provisions a new RSA pair when missing.
+    /// </summary>
     private async ValueTask<byte[]> LoadOrCreatePublicKeyAsync(
         string keyId,
         CancellationToken cancellationToken)
@@ -148,6 +154,9 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Loads an existing RSA pair from persisted private-key material.
+    /// </summary>
     private async ValueTask<RsaKeyPair> LoadExistingKeyPairAsync(
         string keyId,
         CancellationToken cancellationToken)
@@ -158,9 +167,12 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
             .ConfigureAwait(false);
 
         return keyPair ?? throw new KeyNotFoundException(
-            $"RSA-пара '{keyId}' не найдена.");
+            $"RSA key pair '{keyId}' was not found.");
     }
 
+    /// <summary>
+    /// Loads an RSA pair or provisions a new pair when no private-key record exists.
+    /// </summary>
     private async ValueTask<RsaKeyPair> LoadOrCreateKeyPairAsync(
         string keyId,
         CancellationToken cancellationToken)
@@ -183,6 +195,9 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Loads a stored private key and materializes a full RSA pair.
+    /// </summary>
     private async ValueTask<RsaKeyPair?> TryLoadKeyPairAsync(
         string privateKeyId,
         CancellationToken cancellationToken)
@@ -206,6 +221,9 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
         }
     }
 
+    /// <summary>
+    /// Loads a stored private key and derives only its public representation.
+    /// </summary>
     private async ValueTask<byte[]?> TryLoadPublicKeyAsync(
         string privateKeyId,
         CancellationToken cancellationToken)
@@ -229,6 +247,10 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
         }
     }
 
+    /// <summary>
+    /// Publishes one generated RSA candidate using bounded create-only retries and
+    /// returns only the resulting public key.
+    /// </summary>
     private async ValueTask<byte[]> CreateOrLoadWinningPublicKeyAsync(
         string keyId,
         string privateKeyId,
@@ -236,8 +258,8 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Для всей серии конфликтов используем одну RSA-пару. При внешнем
-        // create/delete churn это исключает повторную дорогую генерацию ключа.
+        // Reuse one RSA pair across the entire race. Repeated RSA generation would be
+        // unnecessarily expensive during external create/delete churn.
         using var candidate = _generator.Generate(_keySize);
 
         for (var attempt = 0;
@@ -265,15 +287,19 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
                 return winner;
             }
 
-            // Между проигранным CreateAsync и чтением запись могла быть
-            // удалена. Повторяем публикацию того же кандидата ограниченно.
+            // The winning record may have been deleted between the failed create and load.
+            // Retry publication of the same candidate within the bounded policy.
         }
 
         throw KeyCreationRetryPolicy.CreateExhaustedException(
-            "RSA-пара",
+            "RSA key pair",
             keyId);
     }
 
+    /// <summary>
+    /// Publishes one generated RSA candidate using bounded create-only retries and
+    /// returns the caller-owned winning pair.
+    /// </summary>
     private async ValueTask<RsaKeyPair> CreateOrLoadWinningKeyPairAsync(
         string keyId,
         string privateKeyId,
@@ -297,8 +323,7 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
                         cancellationToken)
                     .ConfigureAwait(false))
                 {
-                    // После успешного CreateAsync владение кандидатом передаётся
-                    // вызывающему коду; здесь его освобождать нельзя.
+                    // Ownership transfers to the caller after successful publication.
                     return candidate;
                 }
 
@@ -313,12 +338,12 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
                     return winner;
                 }
 
-                // Между проигранным CreateAsync и чтением запись могла быть
-                // удалена. Повторяем публикацию той же RSA-пары ограниченно.
+                // The winning record may have been deleted between the failed create and load.
+                // Retry publication of the same RSA pair rather than regenerating it.
             }
 
             throw KeyCreationRetryPolicy.CreateExhaustedException(
-                "RSA-пара",
+                "RSA key pair",
                 keyId);
         }
         catch
@@ -328,6 +353,9 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
         }
     }
 
+    /// <summary>
+    /// Attempts to atomically persist only the private portion of an RSA candidate.
+    /// </summary>
     private async ValueTask<bool> TryPublishCandidateAsync(
         RsaKeyPair candidate,
         string privateKeyId,
@@ -350,6 +378,9 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
         }
     }
 
+    /// <summary>
+    /// Reconstructs a validated RSA pair from persisted PKCS#8 private-key material.
+    /// </summary>
     private static RsaKeyPair CreateKeyPairFromPrivateKey(
         ReadOnlySpan<byte> privateKey)
     {
@@ -367,6 +398,9 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
         }
     }
 
+    /// <summary>
+    /// Validates PKCS#8 private-key material and derives its SubjectPublicKeyInfo public key.
+    /// </summary>
     private static byte[] DerivePublicKey(
         ReadOnlySpan<byte> privateKey)
     {
@@ -379,19 +413,22 @@ public sealed class RsaKeyProvider : IRsaKeyProvider
         if (bytesRead != privateKey.Length)
         {
             throw new CryptographicException(
-                "Закрытый RSA-ключ содержит лишние или некорректные данные.");
+                "RSA private key contains trailing or invalid data.");
         }
 
         if (!RsaKeyOptionsValidator.MeetsMinimumKeySize(rsa.KeySize))
         {
             throw new CryptographicException(
-                $"Размер RSA-ключа не может быть меньше " +
-                $"{RsaKeyOptionsValidator.MinimumKeySize} бит.");
+                $"RSA key size cannot be less than " +
+                $"{RsaKeyOptionsValidator.MinimumKeySize} bits.");
         }
 
         return rsa.ExportSubjectPublicKeyInfo();
     }
 
+    /// <summary>
+    /// Maps a logical RSA identifier to the private-key storage identifier.
+    /// </summary>
     private static string GetPrivateKeyId(string keyId)
     {
         return keyId + PrivateKeySuffix;

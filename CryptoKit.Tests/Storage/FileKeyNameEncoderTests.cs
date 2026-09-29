@@ -3,6 +3,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Storage;
 
+/// <summary>
+/// Verifies deterministic, file-system-safe encoding of logical key identifiers.
+/// </summary>
 public sealed class FileKeyNameEncoderTests
 {
     [Fact]

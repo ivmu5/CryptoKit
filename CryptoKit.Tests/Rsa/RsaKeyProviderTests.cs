@@ -6,6 +6,9 @@ using Xunit;
 
 namespace CryptoKit.Tests.Rsa;
 
+/// <summary>
+/// Verifies RSA key-provider persistence, creation races, and public-key derivation.
+/// </summary>
 public sealed class RsaKeyProviderTests
 {
     [Fact]

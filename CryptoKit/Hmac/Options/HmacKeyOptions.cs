@@ -1,22 +1,18 @@
 namespace CryptoKit.Hmac;
 
 /// <summary>
-/// Представляет настройки создания HMAC-ключей.
+/// Configures generation of new HMAC keys.
 /// </summary>
 public sealed class HmacKeyOptions
 {
     /// <summary>
-    /// Размер нового HMAC-ключа в битах.
-    /// Значение должно быть от 128 до 65536 бит включительно
-    /// и быть кратно восьми.
+    /// Gets or sets the size, in bits, of newly generated HMAC keys.
     /// </summary>
     /// <remarks>
-    /// Значение используется только при создании отсутствующего ключа через
-    /// <see cref="IHmacKeyProvider.GetOrCreateKeyAsync"/>.
-    /// Верхняя граница является эксплуатационным ограничением CryptoKit
-    /// для защиты от чрезмерного выделения памяти при ошибочной конфигурации.
-    /// Уже существующий ключ проверяется независимо от этого ограничения генерации.
-    /// По умолчанию используется 256 бит.
+    /// The generation range is 128 through 65,536 bits and must be divisible by eight.
+    /// The upper bound is an operational guard against accidental excessive allocation.
+    /// It applies only to generation: existing stored key material is validated without
+    /// applying this generation-only maximum. The default is 256 bits.
     /// </remarks>
     public int KeySize { get; set; } = 256;
 }

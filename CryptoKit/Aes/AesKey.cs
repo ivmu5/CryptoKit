@@ -3,20 +3,24 @@ using CryptoKit.Secrets;
 namespace CryptoKit.Aes;
 
 /// <summary>
-/// Представляет секретный AES-ключ с явным временем жизни.
+/// Represents caller-owned AES key material with an explicit lifetime.
 /// </summary>
 /// <remarks>
-/// Экземпляр необходимо освобождать через <see cref="IDisposable.Dispose"/>,
-/// когда ключевой материал больше не требуется.
+/// Dispose the instance when the key material is no longer required.
+/// The key data is stored in an owned buffer managed by <see cref="SecretKeyMaterial"/>.
 /// </remarks>
 public sealed class AesKey : SecretKeyMaterial
 {
     /// <summary>
-    /// Создаёт объект AES-ключа.
+    /// Creates an AES key from existing key material.
     /// </summary>
-    /// <param name="value">
-    /// Бинарные данные AES-ключа.
-    /// </param>
+    /// <param name="value">The AES key bytes.</param>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="value"/> is empty.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The key size is not 128, 192, or 256 bits.
+    /// </exception>
     public AesKey(ReadOnlySpan<byte> value)
         : base(CreateOwnedBuffer(value))
     {
@@ -24,16 +28,19 @@ public sealed class AesKey : SecretKeyMaterial
     }
 
     /// <summary>
-    /// Размер AES-ключа в битах.
+    /// Gets the AES key size in bits.
     /// </summary>
     public int KeySize { get; }
 
+    /// <summary>
+    /// Validates the supplied key material and creates the buffer owned by this instance.
+    /// </summary>
     private static byte[] CreateOwnedBuffer(ReadOnlySpan<byte> value)
     {
         if (value.IsEmpty)
         {
             throw new ArgumentException(
-                "AES-ключ не может быть пустым.",
+                "AES key material cannot be empty.",
                 nameof(value));
         }
 
@@ -46,4 +53,3 @@ public sealed class AesKey : SecretKeyMaterial
         return value.ToArray();
     }
 }
-
